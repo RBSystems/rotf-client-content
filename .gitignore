@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/rotf-client-content/.vs
+/rotf-client-content/packages
+/rotf-client-content/rotf-client-content/bin/Debug
+/rotf-client-content/rotf-client-content/obj/Debug
+rotf-client-content/rotf-client-content/Config.json
