@@ -26,10 +26,10 @@ namespace rotf_client_content
 
         public void PlayVideo(string url)
         {
-            MeElement.LoadedBehavior = MediaState.Manual;
-            MeElement.Source = new Uri(url);
             MeElement.MediaEnded += MeElement_MediaEnded;
-            MeElement.Play();
+
+            MeElement.Source = new Uri(url);
+            //  MeElement.Play();
         }
 
         public event EventHandler OnMediaEnded;

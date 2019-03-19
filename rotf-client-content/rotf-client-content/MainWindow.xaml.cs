@@ -79,6 +79,8 @@ namespace rotf_client_content
 
                 Speaker.LoadedBehavior = MediaState.Manual;
                 Speaker.Source = new Uri("speech.mp3", UriKind.Relative);
+                SpeechBox.Text = text;
+                SpeechBox.Visibility = Visibility.Visible;
                 Speaker.Play();
 
                 
@@ -88,7 +90,12 @@ namespace rotf_client_content
                 Console.WriteLine("Exception caught: " + e.Message);
             }
         }
-                
+
+        private void Speaker_MediaEnded(object sender, RoutedEventArgs e)
+        {
+            SpeechBox.Visibility = Visibility.Collapsed;
+        }
+
         public DataForUI Data { get; set; }        
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -114,12 +121,15 @@ namespace rotf_client_content
         
         private void Messenger_OnLog(object sender, string e)
         {
-            if (e.StartsWith(ConfigurationManager.AppSettings["RoomName"]))
+            if (e.StartsWith(ConfigurationManager.AppSettings["RoomID"]))
             {
                 string[] lines = e.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
                 var theEvent = JsonConvert.DeserializeObject<Event>(lines[1]);
-                AnnounceArrival(theEvent.user);                
+                if (!string.IsNullOrEmpty(theEvent.user) && theEvent.key == "Login")
+                {
+                    AnnounceArrival(theEvent.user);
+                }
             }
         }
 
@@ -164,10 +174,13 @@ namespace rotf_client_content
 
             if (first)
             {
-                LowerProjectorScreen();
-                TurnOnTV();
-                //wait 2 seconds for stuff to turn on
-                System.Threading.Thread.Sleep(2000);
+                if (!IsTVOn())
+                {
+                    LowerProjectorScreen();
+                    TurnOnTV();
+                    //wait 7 seconds for stuff to turn on
+                    System.Threading.Thread.Sleep(7000);
+                }
             }
 
             var config = Newtonsoft.Json.JsonConvert.DeserializeObject<Config>(System.IO.File.ReadAllText("config.json"));
@@ -177,47 +190,70 @@ namespace rotf_client_content
             if (configAction == null)
                 configAction = config.actions.Find(one => one.id == "*");
 
-            if (!string.IsNullOrEmpty(configAction.welcomeMovie))
+            if (!attendee.Arrived)
+            {
+                BlinkLights();
+            }
+
+            if (!string.IsNullOrEmpty(configAction.welcomeMovie) && !attendee.Arrived)
             {
                 //play the movie
-                MediaPlayerWindow mp = new MediaPlayerWindow();
-                mp.OnMediaEnded += (sender, e) =>
+                MediaPlayerWindow mp;
+
+                Dispatcher.Invoke(() =>
                 {
+                    mp = new MediaPlayerWindow();
+
+                    mp.OnMediaEnded += (sender, e) =>
+                    {
                     //show the theme color for a couple seconds
+                    System.Threading.Tasks.Task.Run(() =>
+                        {
+                            Dispatcher.Invoke(() => LastGradientStop.Color = (Color)ColorConverter.ConvertFromString(configAction.themeColor));
+                            System.Threading.Thread.Sleep(2000);
+                            Dispatcher.Invoke(() => LastGradientStop.Color = Colors.White);
+                        });
+
+                    //say the welcome text
+                    Say(configAction.welcomeText.Replace("{Name}", attendee.Name));
+                    };
+                    mp.Show();
+                    mp.PlayVideo(configAction.welcomeMovie);
+                });
+            }
+            else if (!attendee.Arrived)
+            {
+                //show the theme color for a couple seconds
+                if (!string.IsNullOrEmpty(configAction.themeColor))
+                {
                     System.Threading.Tasks.Task.Run(() =>
                     {
                         Dispatcher.Invoke(() => LastGradientStop.Color = (Color)ColorConverter.ConvertFromString(configAction.themeColor));
                         System.Threading.Thread.Sleep(2000);
                         Dispatcher.Invoke(() => LastGradientStop.Color = Colors.White);
-                    });                    
-
-                    //say the welcome text
-                    Say(configAction.welcomeText.Replace("{Name}", attendee.Name));
-                };
-                mp.Show();
-                mp.PlayVideo(configAction.welcomeMovie);
-            }
-            else
-            {
-                //show the theme color for a couple seconds
-                System.Threading.Tasks.Task.Run(() =>
-                {
-                    Dispatcher.Invoke(() => LastGradientStop.Color = (Color)ColorConverter.ConvertFromString(configAction.themeColor));
-                    System.Threading.Thread.Sleep(2000);
-                    Dispatcher.Invoke(() => LastGradientStop.Color = Colors.White);
-                });
+                    });
+                }
 
                 //say the welcome text
-                Say(configAction.welcomeText.Replace("{Name}", attendee.Name));
+                if (!string.IsNullOrEmpty(configAction.welcomeText))
+                {
+                    Say(configAction.welcomeText.Replace("{Name}", attendee.Name));
+                }
             }
 
-            if (attendee.Name == Data.OrganizerName && !string.IsNullOrEmpty(configAction.powerpoint) && attendee.Arrived)
+            if (!string.IsNullOrEmpty(configAction.powerpoint) && attendee.Arrived)
             {
                 //second tap - show powerpoint
-                System.Diagnostics.Process.Start(configAction.powerpoint);
+                System.Diagnostics.Process.Start("powerpnt", "/s " + configAction.powerpoint);
             }
 
             attendee.Arrived = true;
+
+            Dispatcher.Invoke(() =>
+            {
+                this.DataContext = null;
+                this.DataContext = Data;
+            });
         }
 
         private void GetNextMeetingInfo()
@@ -274,10 +310,19 @@ namespace rotf_client_content
             }
         }
 
+        private bool IsTVOn()
+        {
+            System.Net.WebClient wc = new System.Net.WebClient();
+            var x = wc.DownloadString("http://itb-1106B-cp1.byu.edu:8000/buildings/ITB/rooms/1106B");
+            var on = JsonConvert.DeserializeObject<AvApiRequest>(x);
+
+            return on.displays.Find(one => one.name == "D1").power == "on";
+        }
+
         private void LowerProjectorScreen()
         {
             //lower the projector screen
-            System.Threading.Tasks.Task.Factory.StartNew(() =>
+            System.Threading.Tasks.Task.Run(() =>
             {
                 //turn on the projector screen down button
                 System.Net.WebClient wc = new System.Net.WebClient();
@@ -292,7 +337,7 @@ namespace rotf_client_content
         private void RaiseProjectorScreen()
         {
             //raise the projector screen
-            System.Threading.Tasks.Task.Factory.StartNew(() =>
+            System.Threading.Tasks.Task.Run(() =>
             {
                 //turn on the projector screen down button
                 System.Net.WebClient wc = new System.Net.WebClient();
