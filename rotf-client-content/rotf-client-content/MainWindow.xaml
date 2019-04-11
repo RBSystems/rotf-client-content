@@ -108,7 +108,7 @@
             </Border>
 
             <MediaElement Name="Speaker" Width="0" Height="0" MediaEnded="Speaker_MediaEnded" />
-            <Border Grid.ColumnSpan="2" Grid.RowSpan="10" Width="500" Height="500" Background="White">
+            <Border Grid.ColumnSpan="2" Grid.RowSpan="10" Width="500" Height="500" Background="White" Visibility="Collapsed" BorderBrush="Black" BorderThickness="10" Name="SpeechBorder">
                 <TextBlock  Name="SpeechBox" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="64pt" TextAlignment="Center"/>
             </Border>
         </Grid>        

@@ -55,7 +55,7 @@ namespace rotf_client_content
         public void Say(string text)
         {            
             var client = new AmazonPollyClient(Environment.GetEnvironmentVariable("AWS_POLLY_KEY"), Environment.GetEnvironmentVariable("AWS_POLLY_SECRET"), Amazon.RegionEndpoint.USWest1);
-            String outputFileName = "speech.mp3";
+            String outputFileName = text + ".mp3";
 
             var synthesizeSpeechRequest = new SynthesizeSpeechRequest()
             {
@@ -66,6 +66,9 @@ namespace rotf_client_content
 
             try
             {
+                Speaker.LoadedBehavior = MediaState.Manual;
+                Speaker.Stop();
+
                 using (var outputStream = new FileStream(outputFileName, FileMode.Create, FileAccess.Write))
                 {
                     var synthesizeSpeechResponse = client.SynthesizeSpeech(synthesizeSpeechRequest);
@@ -76,11 +79,11 @@ namespace rotf_client_content
                     while ((readBytes = inputStream.Read(buffer, 0, 2 * 1024)) > 0)
                         outputStream.Write(buffer, 0, readBytes);
                 }
-
-                Speaker.LoadedBehavior = MediaState.Manual;
-                Speaker.Source = new Uri("speech.mp3", UriKind.Relative);
+               
+                Speaker.Source = new Uri(outputFileName, UriKind.Relative);
                 SpeechBox.Text = text;
                 SpeechBox.Visibility = Visibility.Visible;
+                SpeechBorder.Visibility = Visibility.Visible;
                 Speaker.Play();
 
                 
@@ -94,6 +97,7 @@ namespace rotf_client_content
         private void Speaker_MediaEnded(object sender, RoutedEventArgs e)
         {
             SpeechBox.Visibility = Visibility.Collapsed;
+            SpeechBorder.Visibility = Visibility.Collapsed;
         }
 
         public DataForUI Data { get; set; }        
@@ -265,7 +269,7 @@ namespace rotf_client_content
 
             CalendarFolder calendar = CalendarFolder.Bind(service, WellKnownFolderName.Calendar, new PropertySet());
 
-            CalendarView cView = new CalendarView(DateTime.Today, DateTime.Today.AddDays(1));
+            CalendarView cView = new CalendarView(DateTime.Today, DateTime.Today.AddDays(2));
             cView.PropertySet = new PropertySet(AppointmentSchema.Subject, AppointmentSchema.Start, AppointmentSchema.End, AppointmentSchema.Organizer);
 
             FindItemsResults<Appointment> appointments = calendar.FindAppointments(cView);            
